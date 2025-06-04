@@ -4,15 +4,29 @@ from users.schema import UserType
 from links.models import Link, Vote
 from graphql import GraphQLError
 from django.db.models import Q
+from graphene_django.filter import DjangoFilterConnectionField
 
 
 class LinkType(DjangoObjectType):
     class Meta:
         model = Link
 
+class CountableConnectionBase(graphene.relay.Connection):
+    class Meta:
+        abstract = True
+
+    total_count = graphene.Int()
+
+    def resolve_total_count(self, info, **kwargs):
+        return self.iterable.count()
+
 class VoteType(DjangoObjectType):
     class Meta:
         model = Vote
+        fields = ('user', 'link')
+        filter_fields = ('user', 'link')
+        interfaces = (graphene.relay.Node,)
+        connection_class = CountableConnectionBase
 
 class Query(graphene.ObjectType):
     links = graphene.List(
@@ -21,7 +35,9 @@ class Query(graphene.ObjectType):
        first=graphene.Int(),
        skip=graphene.Int(),
     )
-    votes = graphene.List(VoteType)
+    #votes = graphene.List(VoteType)
+    votes = DjangoFilterConnectionField(VoteType)
+
 
     def resolve_links(self, info, search=None, first=None, skip=None, **kwargs):
         qs = Link.objects.all()
